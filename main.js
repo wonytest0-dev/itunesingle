@@ -3,6 +3,10 @@ const TelegramBot = require("node-telegram-bot-api");
 const COUNTRY = require("./lib/country.json");
 const { fetchAllRegions, findArtistRanksCustom } = require("./lib/scraper");
 const { createClient } = require("@supabase/supabase-js");
+const express = require("express"); // ✅ TAMBAHAN
+
+const app = express(); // ✅ TAMBAHAN
+app.use(express.json()); // ✅ TAMBAHAN
 
 const token = process.env.BOT_TOKEN;
 
@@ -11,7 +15,11 @@ if (!token) {
   process.exit(1);
 }
 
-const bot = new TelegramBot(token, { polling: true });
+// ❌ HAPUS polling
+// const bot = new TelegramBot(token, { polling: true });
+
+// ✅ GANTI webhook mode
+const bot = new TelegramBot(token);
 
 // ✅ SUPABASE INIT
 const supabase = createClient(
@@ -178,7 +186,7 @@ function formatResults(query, results) {
   return lines.join("\n").trim();
 }
 
-// ✅ FIXED TRACKING (NO COUNTRY)
+// ✅ TRACKING
 async function checkAndSaveNumberOne(song, artist, results) {
   const newOnes = [];
   const alreadyOnes = [];
@@ -232,21 +240,17 @@ function splitMessage(text, maxLength = 3500) {
   return chunks;
 }
 
+// ✅ START COMMAND
 bot.onText(/^\/start$/, async (msg) => {
   const chatId = msg.chat.id;
 
-  const text = [
-    "Hello, please use this format:",
-    "Title - Artist",
-    "",
-    "Examples:",
-    "ARIRANG - BTS",
-    "APT. - ROSÉ",
-  ].join("\n");
-
-  await bot.sendMessage(chatId, text);
+  await bot.sendMessage(
+    chatId,
+    "Hello, please use format:\nTitle - Artist"
+  );
 });
 
+// ✅ MESSAGE HANDLER
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || "").trim();
@@ -301,4 +305,15 @@ bot.on("message", async (msg) => {
   }
 });
 
-log("🤖 Bot running...");
+// ✅ WEBHOOK ROUTE (INI YANG PENTING)
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// ✅ PORT (BIAR RENDER GA ERROR)
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🚀 Webhook server running on port", PORT);
+});
